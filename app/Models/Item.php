@@ -3,9 +3,22 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Models\ItemStock;
+use App\Models\ItemTransaction;
+use App\Models\Treatment;
+use App\Models\Location;
+use App\Models\Category;
+
+use Illuminate\Database\Eloquent\BroadcastsEvents;
 
 class Item extends Model
 {
+    use BroadcastsEvents;
+
+    public function broadcastOn($event)
+    {
+        return ['inventory'];
+    }
     protected $fillable = [
         'location_id',
         'category_id',
@@ -40,5 +53,15 @@ class Item extends Model
     {
         return $this->belongsToMany(Treatment::class, 'treatment_items')
                     ->withPivot('quantity');
+    }
+
+    public function category()
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    public function location()
+    {
+        return $this->belongsTo(Location::class);
     }
 }

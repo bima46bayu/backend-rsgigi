@@ -4,15 +4,18 @@ namespace App\Services;
 
 use App\Models\Record;
 use App\Models\RecordItem;
+use App\Models\RecordTreatment;
 use App\Models\Treatment;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 use Exception;
 
 class RecordService
 {
-    public function __construct(private InventoryService $inventoryService)
-    {
-    }
+    public function __construct(
+        private InventoryService $inventoryService
+    ) {}
 
     /*
     |--------------------------------------------------------------------------
@@ -20,38 +23,44 @@ class RecordService
     |--------------------------------------------------------------------------
     */
 
-    public function createDraft(int $locationId, ?int $treatmentId, ?string $patientName)
+    public function createDraft(int $locationId, array $treatments, ?string $patientName)
     {
-        return DB::transaction(function () use ($locationId, $treatmentId, $patientName) {
+        return DB::transaction(function () use ($locationId, $treatments, $patientName) {
 
             $record = Record::create([
+                'code' => 'REC-' . date('Ymd') . '-' . strtoupper(Str::random(4)),
                 'location_id' => $locationId,
-                'treatment_id'=> $treatmentId,
-                'patient_name'=> $patientName,
-                'status'      => 'draft'
+                'patient_name' => $patientName,
+                'status' => 'draft'
             ]);
 
-            // Copy template items jika ada treatment
-            if ($treatmentId) {
+            foreach ($treatments as $treatmentId) {
+
+                $rt = RecordTreatment::create([
+                    'record_id' => $record->id,
+                    'treatment_id' => $treatmentId
+                ]);
 
                 $treatment = Treatment::with('items')->findOrFail($treatmentId);
 
                 foreach ($treatment->items as $item) {
+
                     RecordItem::create([
                         'record_id' => $record->id,
-                        'item_id'   => $item->id,
-                        'quantity'  => $item->pivot->quantity
+                        'record_treatment_id' => $rt->id,
+                        'item_id' => $item->id,
+                        'quantity' => $item->pivot->quantity
                     ]);
                 }
             }
 
-            return $record->load('items');
+            return $record->load('items', 'treatments');
         });
     }
 
     /*
     |--------------------------------------------------------------------------
-    | UPDATE ITEMS (Override / Add / Remove)
+    | UPDATE ITEMS
     |--------------------------------------------------------------------------
     */
 
@@ -62,27 +71,36 @@ class RecordService
             $record = Record::with('items')->findOrFail($recordId);
 
             if ($record->status !== 'draft') {
-                throw new Exception('Record sudah final, tidak bisa diubah.');
+                throw new Exception('Record sudah final dan tidak bisa diubah.');
             }
 
-            // Hapus semua dulu
             $record->items()->delete();
 
             foreach ($items as $item) {
+
+                if (!isset($item['id'], $item['quantity'])) {
+                    throw new Exception('Format item tidak valid.');
+                }
+
+                if ($item['quantity'] <= 0) {
+                    continue;
+                }
+
                 RecordItem::create([
                     'record_id' => $record->id,
+                    'record_treatment_id' => $item['record_treatment_id'] ?? null,
                     'item_id'   => $item['id'],
                     'quantity'  => $item['quantity']
                 ]);
             }
 
-            return $record->load('items');
+            return $record->fresh()->load('items');
         });
     }
 
     /*
     |--------------------------------------------------------------------------
-    | COMPLETE RECORD (POTONG STOCK)
+    | COMPLETE RECORD (FIFO STOCK OUT)
     |--------------------------------------------------------------------------
     */
 
@@ -90,23 +108,29 @@ class RecordService
     {
         return DB::transaction(function () use ($recordId) {
 
-            $record = Record::with('items')
+            $record = Record::with('items.item')
                 ->lockForUpdate()
                 ->findOrFail($recordId);
 
             if ($record->status !== 'draft') {
-                throw new \Exception('Record tidak dalam status draft.');
+                throw new Exception('Record tidak dalam status draft.');
             }
 
             $insufficientItems = [];
 
-            // 🔎 STEP 1: VALIDASI SEMUA ITEM DULU
             foreach ($record->items as $recordItem) {
 
-                $totalStock = $this->inventoryService
-                    ->getTotalStock($recordItem->item_id);
+                if ($recordItem->item->type === 'non-stock') {
+                    continue;
+                }
+
+                $totalStock = $this->inventoryService->getTotalStock(
+                    $record->location_id,
+                    $recordItem->item_id
+                );
 
                 if ($totalStock < $recordItem->quantity) {
+
                     $insufficientItems[] = [
                         'item_id'   => $recordItem->item_id,
                         'requested' => $recordItem->quantity,
@@ -115,18 +139,21 @@ class RecordService
                 }
             }
 
-            // ❌ Jika ada kekurangan → batalkan
             if (!empty($insufficientItems)) {
-                throw new \Exception(json_encode([
-                    'message' => 'Stock tidak mencukupi',
-                    'insufficient_items' => $insufficientItems
-                ]));
+
+                throw ValidationException::withMessages([
+                    'stock' => $insufficientItems
+                ]);
             }
 
-            // ✅ STEP 2: Kalau semua cukup → potong FIFO
             foreach ($record->items as $recordItem) {
 
+                if ($recordItem->item->type === 'non-stock') {
+                    continue;
+                }
+
                 $this->inventoryService->stockOut(
+                    $record->location_id,
                     $recordItem->item_id,
                     $recordItem->quantity,
                     'record',
@@ -135,11 +162,52 @@ class RecordService
             }
 
             $record->update([
-                'status' => 'completed',
+                'status'       => 'completed',
                 'performed_at' => now()
             ]);
 
-            return $record;
+            return $record->fresh()->load('items');
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | REJECT RECORD (RETURN STOCK)
+    |--------------------------------------------------------------------------
+    */
+
+    public function reject(int $recordId)
+    {
+        return DB::transaction(function () use ($recordId) {
+
+            $record = Record::with('items.item')
+                ->lockForUpdate()
+                ->findOrFail($recordId);
+
+            if ($record->status !== 'completed') {
+                throw new Exception('Hanya record completed yang bisa direject.');
+            }
+
+            foreach ($record->items as $recordItem) {
+
+                if ($recordItem->item->type === 'non-stock') {
+                    continue;
+                }
+
+                $this->inventoryService->stockIn(
+                    $record->location_id,
+                    $recordItem->item_id,
+                    $recordItem->quantity,
+                    'record_reversal',
+                    $record->id
+                );
+            }
+
+            $record->update([
+                'status' => 'cancelled'
+            ]);
+
+            return $record->fresh()->load('items');
         });
     }
 }

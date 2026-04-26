@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\Item;
-use App\Models\ItemStock;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
@@ -11,33 +10,12 @@ class InventoryService
 {
     /*
     |--------------------------------------------------------------------------
-    | INITIAL STOCK
-    |--------------------------------------------------------------------------
-    */
-    public function setInitialStock(
-        int $itemId,
-        int $quantity,
-        ?string $batchNumber = null,
-        ?string $expiryDate = null
-    ): void {
-
-        $this->stockIn(
-            $itemId,
-            $quantity,
-            $batchNumber,
-            $expiryDate,
-            'initial_stock',
-            null
-        );
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | STOCK IN (Purchase / GR)
+    | STOCK IN
     |--------------------------------------------------------------------------
     */
 
     public function stockIn(
+        int $locationId,
         int $itemId,
         int $quantity,
         ?string $batchNumber = null,
@@ -45,7 +23,9 @@ class InventoryService
         ?string $referenceType = null,
         ?int $referenceId = null
     ): void {
+
         DB::transaction(function () use (
+            $locationId,
             $itemId,
             $quantity,
             $batchNumber,
@@ -57,11 +37,15 @@ class InventoryService
             $item = Item::lockForUpdate()->findOrFail($itemId);
 
             if ($item->type === 'non-stock') {
-                throw new Exception('Item non-stock tidak bisa ditambahkan stok.');
+                throw new Exception('Item non-stock tidak memiliki stok.');
             }
 
+            // Generate otomatis batch number jika tidak diisi
+            $finalBatchNumber = $batchNumber ?: 'ADJUST/' . date('Ymd') . '/' . strtoupper(\Illuminate\Support\Str::random(4));
+
             $batch = $item->stocks()->create([
-                'batch_number' => $batchNumber,
+                'location_id'  => $locationId,
+                'batch_number' => $finalBatchNumber,
                 'quantity'     => $quantity,
                 'expiry_date'  => $expiryDate,
             ]);
@@ -80,30 +64,35 @@ class InventoryService
 
     /*
     |--------------------------------------------------------------------------
-    | STOCK OUT (FIFO)
+    | STOCK OUT FIFO
     |--------------------------------------------------------------------------
     */
 
     public function stockOut(
+        int $locationId,
         int $itemId,
         int $quantity,
         ?string $referenceType = null,
         ?int $referenceId = null
     ): void {
+
         DB::transaction(function () use (
+            $locationId,
             $itemId,
             $quantity,
             $referenceType,
             $referenceId
         ) {
 
-            $item = Item::lockForUpdate()->with('stocks')->findOrFail($itemId);
+            $item = Item::lockForUpdate()->findOrFail($itemId);
 
             if ($item->type === 'non-stock') {
                 throw new Exception('Item non-stock tidak memiliki stok.');
             }
 
-            $totalStock = $item->stocks()->sum('quantity');
+            $totalStock = $item->stocks()
+                ->where('location_id', $locationId)
+                ->sum('quantity');
 
             if ($totalStock < $quantity) {
                 throw new Exception('Stok tidak mencukupi.');
@@ -111,8 +100,8 @@ class InventoryService
 
             $remaining = $quantity;
 
-            // FIFO berdasarkan created_at
             $batches = $item->stocks()
+                ->where('location_id', $locationId)
                 ->where('quantity', '>', 0)
                 ->orderBy('created_at')
                 ->lockForUpdate()
@@ -137,31 +126,12 @@ class InventoryService
                 $remaining -= $deduct;
             }
 
+            if ($remaining > 0) {
+                throw new Exception('FIFO deduction gagal.');
+            }
+
             $item->increment('version');
         });
-    }
-
-    /*
-    |--------------------------------------------------------------------------
-    | MANUAL ADJUSTMENT (Optional)
-    |--------------------------------------------------------------------------
-    */
-
-    public function adjustStock(
-        int $itemId,
-        int $quantity,
-        string $type, // in / out
-        string $note = 'manual_adjustment'
-    ): void {
-        if (!in_array($type, ['in', 'out'])) {
-            throw new Exception('Tipe tidak valid.');
-        }
-
-        if ($type === 'in') {
-            $this->stockIn($itemId, $quantity, null, null, $note, null);
-        } else {
-            $this->stockOut($itemId, $quantity, $note, null);
-        }
     }
 
     /*
@@ -170,24 +140,27 @@ class InventoryService
     |--------------------------------------------------------------------------
     */
 
-    public function getTotalStock(int $itemId): int
+    public function getTotalStock(int $locationId, int $itemId): int
     {
-        $item = Item::with('stocks')->findOrFail($itemId);
-
-        return $item->stocks()->sum('quantity');
+        return Item::findOrFail($itemId)
+            ->stocks()
+            ->where('location_id', $locationId)
+            ->sum('quantity');
     }
 
     /*
     |--------------------------------------------------------------------------
-    | CHECK LOW STOCK (Static min_stock)
+    | LOW STOCK CHECK
     |--------------------------------------------------------------------------
     */
 
-    public function isBelowMinStock(int $itemId): bool
+    public function isBelowMinStock(int $locationId, int $itemId): bool
     {
-        $item = Item::with('stocks')->findOrFail($itemId);
+        $item = Item::findOrFail($itemId);
 
-        $totalStock = $item->stocks()->sum('quantity');
+        $totalStock = $item->stocks()
+            ->where('location_id', $locationId)
+            ->sum('quantity');
 
         return $totalStock <= $item->min_stock;
     }

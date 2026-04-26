@@ -17,7 +17,6 @@ class TreatmentController extends Controller
     {
         return Treatment::with('items')
             ->where('location_id', $request->user()->location_id)
-            ->where('is_active', true)
             ->get();
     }
 

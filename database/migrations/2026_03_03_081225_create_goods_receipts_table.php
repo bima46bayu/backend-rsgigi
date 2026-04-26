@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('goods_receipts', function (Blueprint $table) {
+            $table->id();
+            $table->string('gr_number')->unique();
+            $table->foreignId('purchase_order_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('location_id')->constrained()->cascadeOnDelete();
+
+            $table->enum('status', ['draft', 'completed'])->default('draft');
+
+            $table->timestamp('received_at')->nullable();
+            $table->timestamp('completed_at')->nullable();
+
+            $table->foreignId('created_by')->constrained('users');
+
+            $table->timestamps();
+
+            $table->index(['location_id', 'status']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('goods_receipts');
+    }
+};

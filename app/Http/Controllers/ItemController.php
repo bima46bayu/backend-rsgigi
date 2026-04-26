@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Item;
 use Illuminate\Http\Request;
 use App\Services\InventoryService;
+use Illuminate\Validation\Rule;
 
 class ItemController extends Controller
 {
@@ -26,6 +27,57 @@ class ItemController extends Controller
             ->append('total_stock');
     }
 
+    public function show(Request $request, $id)
+    {
+        return Item::with('category')
+            ->where('location_id', $request->user()->location_id)
+            ->findOrFail($id)
+            ->append('total_stock');
+    }
+
+    public function stocks(Request $request, $id)
+    {
+        $item = Item::where('location_id', $request->user()->location_id)
+            ->findOrFail($id);
+
+        return $item->stocks()
+            ->where('location_id', $request->user()->location_id)
+            ->where('quantity', '>', 0)
+            ->orderBy('created_at')
+            ->paginate(20);
+    }
+
+    public function transactions(Request $request, $id)
+    {
+        $item = Item::where('location_id', $request->user()->location_id)
+            ->findOrFail($id);
+
+        $paginator = $item->transactions()
+            ->with('stock')
+            ->latest()
+            ->paginate(20);
+
+        $paginator->getCollection()->transform(function ($transaction) {
+            $code = $transaction->reference_id ? ('#' . $transaction->reference_id) : '';
+            if ($transaction->reference_type === 'record') {
+                $record = \App\Models\Record::find($transaction->reference_id);
+                if ($record) $code = $record->code;
+            } elseif ($transaction->reference_type === 'goods_receipt') {
+                $gr = \App\Models\GoodsReceipt::with('purchaseOrder')->find($transaction->reference_id);
+                if ($gr && $gr->purchaseOrder) {
+                    $code = $gr->purchaseOrder->po_number;
+                } elseif ($gr) {
+                    $code = $gr->gr_number;
+                }
+            }
+            $arr = $transaction->toArray();
+            $arr['reference_code'] = $code;
+            return $arr;
+        });
+
+        return $paginator;
+    }
+
     /*
     |--------------------------------------------------------------------------
     | CREATE ITEM + OPTIONAL INITIAL STOCK
@@ -35,13 +87,18 @@ class ItemController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name'          => 'required',
+            'name'          => [
+                'required',
+                Rule::unique('items')->where(fn ($q) => $q->where('location_id', $request->user()->location_id))
+            ],
             'category_id'   => 'required|exists:categories,id',
             'type'          => 'required|in:stock,non-stock',
             'min_stock'     => 'required|integer|min:0',
             'initial_stock' => 'nullable|integer|min:0',
             'batch_number'  => 'nullable|string',
             'expiry_date'   => 'nullable|date'
+        ], [
+            'name.unique' => 'Barang dengan nama ini sudah ada di cabang ini.'
         ]);
 
         $item = Item::create([
@@ -57,11 +114,14 @@ class ItemController extends Controller
             $item->type === 'stock' &&
             $request->initial_stock > 0
         ) {
-            $this->inventoryService->setInitialStock(
+            $this->inventoryService->stockIn(
+                $request->user()->location_id,
                 $item->id,
                 $request->initial_stock,
                 $request->batch_number,
-                $request->expiry_date
+                $request->expiry_date,
+                'initial_stock',
+                $item->id
             );
         }
 
@@ -80,16 +140,25 @@ class ItemController extends Controller
                     ->findOrFail($id);
 
         $request->validate([
-            'name'      => 'required',
-            'min_stock' => 'required|integer|min:0'
+            'name'        => [
+                'required',
+                Rule::unique('items')->where(fn ($q) => $q->where('location_id', $request->user()->location_id))->ignore($id)
+            ],
+            'category_id' => 'required|exists:categories,id',
+            'type'        => 'required|in:stock,non-stock',
+            'min_stock'   => 'required|integer|min:0'
+        ], [
+            'name.unique' => 'Barang dengan nama ini sudah ada di cabang ini.'
         ]);
 
         $item->update([
-            'name'      => $request->name,
-            'min_stock' => $request->min_stock
+            'name'        => $request->name,
+            'category_id' => $request->category_id,
+            'type'        => $request->type,
+            'min_stock'   => $request->min_stock
         ]);
 
-        return $item;
+        return $item->load('category')->append('total_stock');
     }
 
     /*
@@ -126,11 +195,12 @@ class ItemController extends Controller
         ]);
 
         $this->inventoryService->stockIn(
+            $request->user()->location_id,
             $item->id,
             $request->quantity,
             $request->batch_number,
             $request->expiry_date,
-            'purchase',
+            'adjust_in',
             $request->reference_id ?? null
         );
 
@@ -153,9 +223,10 @@ class ItemController extends Controller
         ]);
 
         $this->inventoryService->stockOut(
+            $request->user()->location_id,
             $item->id,
             $request->quantity,
-            'tindakan',
+            'adjust_out',
             $request->reference_id ?? null
         );
 
@@ -173,7 +244,10 @@ class ItemController extends Controller
         $item = Item::where('location_id', $request->user()->location_id)
                     ->findOrFail($id);
 
-        $total = $this->inventoryService->getTotalStock($item->id);
+        $total = $this->inventoryService->getTotalStock(
+            $request->user()->location_id,
+            $item->id
+        );
 
         return response()->json([
             'item_id' => $item->id,

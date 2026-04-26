@@ -63,22 +63,24 @@ class UserController extends Controller
         $user = $request->user();
 
         $request->validate([
-            'name'     => 'required',
-            'email'    => 'required|email|unique:users,email,' . $user->id,
-            'password' => 'nullable|min:6',
+            'name'         => 'required|string|max:255',
+            'email'        => 'required|email|unique:users,email,' . $user->id,
+            'phone_number' => 'nullable|string',
+            'password'     => 'nullable|min:6|confirmed',
         ]);
 
-        $user->name  = $request->name;
+        $user->name = $request->name;
         $user->email = $request->email;
+        $user->phone_number = $request->phone_number;
 
         if ($request->filled('password')) {
-            $user->password = \Illuminate\Support\Facades\Hash::make($request->password);
+            $user->password = Hash::make($request->password);
         }
 
         $user->save();
 
         return response()->json([
-            'message' => 'Profile updated',
+            'message' => 'Profil berhasil diperbarui',
             'user' => $user->load('roles', 'location')
         ]);
     }
