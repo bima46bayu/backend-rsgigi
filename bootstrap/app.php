@@ -28,7 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // [QUEUE WORKER] Eksekusi antrean setiap menit lalu langsung berhenti jika kosong
         $schedule->command('queue:work --stop-when-empty')
                  ->everyMinute()
-                 ->withoutOverlapping();
+                 ->withoutOverlapping()
+                 ->runInBackground();
     })
     ->withMiddleware(function (Middleware $middleware): void {
 
