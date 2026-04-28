@@ -50,7 +50,6 @@ class CheckInventoryAlert extends Command
                 $newStatus = 'normal';
 
                 if ($avgDailyUsage > 0) {
-
                     $daysRemaining = $totalStock / $avgDailyUsage;
 
                     if ($daysRemaining <= 2) {
@@ -58,11 +57,13 @@ class CheckInventoryAlert extends Command
                     } elseif ($daysRemaining <= 5) {
                         $newStatus = 'warning';
                     }
+                }
 
-                } else {
-                    if ($totalStock <= $item->min_stock) {
-                        $newStatus = 'warning';
-                    }
+                // Aturan Absolut (Safety Net): Menimpa hasil prediksi di atas jika kondisinya lebih bahaya
+                if ($totalStock <= 0) {
+                    $newStatus = 'critical'; // Kosong mutlak = Kritis
+                } elseif ($totalStock <= $item->min_stock && $newStatus !== 'critical') {
+                    $newStatus = 'warning'; // Dibawah batas minimal = Setidaknya harus Warning
                 }
 
                 $statusChanged = $item->alert_status !== $newStatus;

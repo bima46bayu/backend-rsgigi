@@ -24,6 +24,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // [TESTING] Hapus tanda "//" di bawah jika ingin testing berjalan tiap 1 menit:
         // $schedule->command('inventory:check-alert')->everyMinute();
         // $schedule->command('inventory:check-expiry')->everyMinute();
+
+        // [QUEUE WORKER] Eksekusi antrean setiap menit lalu langsung berhenti jika kosong
+        $schedule->command('queue:work --stop-when-empty')
+                 ->everyMinute()
+                 ->withoutOverlapping();
     })
     ->withMiddleware(function (Middleware $middleware): void {
 
