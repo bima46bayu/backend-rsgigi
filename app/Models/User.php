@@ -26,6 +26,7 @@ class User extends Authenticatable
         'password',
         'location_id',
         'phone_number',
+        'receive_alert',
     ];
 
     /**
@@ -48,6 +49,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'receive_alert' => 'boolean',
         ];
     }
 
