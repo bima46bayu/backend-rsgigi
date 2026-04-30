@@ -18,12 +18,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withSchedule(function (Schedule $schedule) {
         // [PRODUCTION] Jadwal berjalan otomatis pada jam tertentu
-        $schedule->command('inventory:check-alert')->dailyAt('07:00');
-        $schedule->command('inventory:check-expiry')->daily();
+        // $schedule->command('inventory:check-alert')->dailyAt('07:00');
+        // $schedule->command('inventory:check-expiry')->daily();
 
         // [TESTING] Hapus tanda "//" di bawah jika ingin testing berjalan tiap 1 menit:
-        // $schedule->command('inventory:check-alert')->everyMinute();
-        // $schedule->command('inventory:check-expiry')->everyMinute();
+        $schedule->command('inventory:check-alert')->everyMinute();
+        $schedule->command('inventory:check-expiry')->everyMinute();
 
         // [QUEUE WORKER] Eksekusi antrean setiap menit lalu langsung berhenti jika kosong
         $schedule->command('queue:work --stop-when-empty')
