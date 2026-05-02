@@ -69,7 +69,7 @@ class CheckInventoryAlert extends Command
                 $statusChanged = $item->alert_status !== $newStatus;
 
                 $reminderAllowed = !$item->last_alert_sent_at ||
-                    $item->last_alert_sent_at->diffInDays(now()) >= 1;
+                    !$item->last_alert_sent_at->isSameDay(now());
 
                 if ($newStatus !== 'normal' && ($statusChanged || $reminderAllowed)) {
 
