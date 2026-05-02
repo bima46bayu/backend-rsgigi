@@ -33,6 +33,9 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withMiddleware(function (Middleware $middleware): void {
 
+        // Bypass cPanel Header Stripping
+        $middleware->append(\App\Http\Middleware\RestoreAuthorizationHeader::class);
+
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
