@@ -5,7 +5,11 @@
 
     RewriteEngine On
 
-    # Handle Authorization Header
+    # Fix untuk cPanel / FastCGI yang sering menghapus header Authorization
+    CGIPassAuth On
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+
+    # Handle Authorization Header (Default Laravel)
     RewriteCond %{HTTP:Authorization} .
     RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
