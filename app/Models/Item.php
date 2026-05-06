@@ -9,16 +9,9 @@ use App\Models\Treatment;
 use App\Models\Location;
 use App\Models\Category;
 
-use Illuminate\Database\Eloquent\BroadcastsEvents;
-
 class Item extends Model
 {
-    use BroadcastsEvents;
 
-    public function broadcastOn($event)
-    {
-        return ['inventory'];
-    }
     protected $fillable = [
         'location_id',
         'category_id',

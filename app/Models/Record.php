@@ -7,16 +7,9 @@ use App\Models\RecordItem;
 use App\Models\Treatment;
 use App\Models\Location;
 
-use Illuminate\Database\Eloquent\BroadcastsEvents;
-
 class Record extends Model
 {
-    use BroadcastsEvents;
 
-    public function broadcastOn($event)
-    {
-        return ['records'];
-    }
     protected $fillable = [
         'code',
         'location_id',

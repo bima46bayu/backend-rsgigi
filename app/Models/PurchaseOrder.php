@@ -9,16 +9,9 @@ use App\Models\Location;
 use App\Models\User;
 use App\Models\GoodsReceipt;
 
-use Illuminate\Database\Eloquent\BroadcastsEvents;
-
 class PurchaseOrder extends Model
 {
-    use BroadcastsEvents;
 
-    public function broadcastOn($event)
-    {
-        return ['purchases'];
-    }
     protected $fillable = [
         'po_number',
         'location_id',
