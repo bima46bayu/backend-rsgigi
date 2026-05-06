@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\Item;
 use App\Models\Location;
 use App\Models\User;
 use App\Notifications\InventoryAlertNotification;
@@ -34,6 +35,10 @@ class SendInventoryAlertJob implements ShouldQueue
         $this->sendWhatsApp($location, $message);
         $this->sendEmail($location, $message);
         $this->sendDatabaseNotification($location, $message);
+
+        // ✅ Update last_alert_sent_at SETELAH semua notifikasi berhasil terkirim
+        $itemIds = collect($this->alerts)->pluck('item_id');
+        Item::whereIn('id', $itemIds)->update(['last_alert_sent_at' => now()]);
     }
 
     private function buildMessage(): string

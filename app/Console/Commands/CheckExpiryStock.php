@@ -4,8 +4,6 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\ItemStock;
-use App\Models\User;
-use App\Notifications\StockExpiryNotification;
 use Carbon\Carbon;
 
 class CheckExpiryStock extends Command
@@ -35,8 +33,6 @@ class CheckExpiryStock extends Command
             ->whereDate('expiry_date', '<=', $warningDateSlowMoving)
             ->get()
             ->groupBy('location_id');
-
-        $users = User::where('receive_alert', true)->get();
 
         foreach ($stocks as $locationId => $locationStocks) {
 
@@ -80,29 +76,19 @@ class CheckExpiryStock extends Command
 
                 // Data untuk Ringkasan WhatsApp/Email
                 $expirySummary[] = [
+                    'stock_id' => $stock->id,
                     'name' => $stock->item->name,
                     'batch_number' => $stock->batch_number,
                     'expiry_date' => $stock->expiry_date->format('Y-m-d'),
+                    'quantity' => $stock->quantity,
                     'status' => $status,
+                    'days_remaining' => $daysRemaining,
                 ];
 
-                // Notifikasi Database (Tetap individual untuk record di Dashboard)
-                foreach ($users as $user) {
-                    if (!$user->location_id || $user->location_id == $locationId) {
-                        $user->notify(new StockExpiryNotification(
-                            $stock,
-                            $status,
-                            $daysRemaining
-                        ));
-                    }
-                }
-
-                $stock->update([
-                    'expiry_alert_sent_at' => now()
-                ]);
+                // expiry_alert_sent_at akan di-update oleh Job setelah notifikasi benar-benar terkirim
             }
 
-            // Kirim Ringkasan ke WhatsApp & Email via Job
+            // Kirim Ringkasan ke WhatsApp, Email & Database via Job
             if (!empty($expirySummary)) {
                 dispatch(new \App\Jobs\SendStockExpiryJob($locationId, $expirySummary));
             }

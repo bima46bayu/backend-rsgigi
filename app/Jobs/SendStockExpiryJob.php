@@ -35,6 +35,13 @@ class SendStockExpiryJob implements ShouldQueue
         $this->sendWhatsApp($location, $message);
         $this->sendEmail($location, $message);
         $this->sendDatabaseNotifications($location);
+
+        // ✅ Update expiry_alert_sent_at SETELAH semua notifikasi berhasil terkirim
+        $stockIds = collect($this->expiryDetails)->pluck('stock_id')->filter();
+        if ($stockIds->isNotEmpty()) {
+            \App\Models\ItemStock::whereIn('id', $stockIds)
+                ->update(['expiry_alert_sent_at' => now()]);
+        }
     }
 
     private function buildMessage(string $locationName): string
@@ -129,15 +136,11 @@ class SendStockExpiryJob implements ShouldQueue
 
         if ($users->isEmpty()) return;
 
+        // Kirim notifikasi database per item expiry
         foreach ($this->expiryDetails as $detail) {
-            // Kita sudah update di CheckExpiryStock sebenarnya untuk anti-spam,
-            // Tapi kita pastikan kirim notifikasi database di sini per item.
-            // Note: $detail['stock_model'] harusnya berisi model ItemStock jika kita ingin langsung kirim
-            // Tapi untuk database notification, lebih baik kirim per item agar record masuk ke tabel notifications.
-            
-            // Kita ambil stok aslinya jika perlu, tapi di sini kita pakai data dari array saja.
-            // Karena StockExpiryNotification butuh object ItemStock, 
-            // Kita pastikan data yang dikirim ke Job mencukupi.
+            Notification::send($users, new \App\Notifications\ExpiryAlertDatabaseNotification(
+                $detail
+            ));
         }
     }
 }

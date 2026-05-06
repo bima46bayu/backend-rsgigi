@@ -81,9 +81,9 @@ class CheckInventoryAlert extends Command
                         'location_name' => $item->location->name
                     ];
 
+                    // last_alert_sent_at akan di-update oleh Job setelah notifikasi benar-benar terkirim
                     $item->update([
                         'alert_status' => $newStatus,
-                        'last_alert_sent_at' => now()
                     ]);
 
                 } else {
