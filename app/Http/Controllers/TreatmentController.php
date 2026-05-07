@@ -15,9 +15,17 @@ class TreatmentController extends Controller
 
     public function index(Request $request)
     {
-        return Treatment::with('items')
+        $treatments = Treatment::with('items')
             ->where('location_id', $request->user()->location_id)
             ->get();
+
+        $treatments->each(function($t) {
+            $t->items->each(function($i) {
+                $i->append('total_stock');
+            });
+        });
+
+        return $treatments;
     }
 
     /*

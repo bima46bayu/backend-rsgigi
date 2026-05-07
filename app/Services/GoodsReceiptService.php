@@ -85,6 +85,7 @@ class GoodsReceiptService
                         'location_id' => $gr->location_id,
                         'batch_number' => $gr->gr_number,
                         'quantity' => $item->qty_received,
+                        'unit_cost' => $item->unit_cost,
                         'expiry_date' => $item->expiry_date
                     ]);
 

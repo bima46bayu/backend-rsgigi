@@ -21,10 +21,16 @@ class ItemController extends Controller
 
     public function index(Request $request)
     {
-        return Item::with('category')
-            ->where('location_id', $request->user()->location_id)
-            ->get()
-            ->append('total_stock');
+        $query = Item::with('category')
+            ->where('location_id', $request->user()->location_id);
+            
+        if ($request->query('with_stocks') === 'true' || $request->query('with_stocks') == '1') {
+            $query->with(['stocks' => function($q) {
+                $q->where('quantity', '>', 0);
+            }]);
+        }
+            
+        return $query->get()->append('total_stock');
     }
 
     public function show(Request $request, $id)
@@ -95,8 +101,11 @@ class ItemController extends Controller
             'type'          => 'required|in:stock,non-stock',
             'min_stock'     => 'required|integer|min:0',
             'initial_stock' => 'nullable|integer|min:0',
+            'unit_cost'     => 'nullable|numeric|min:0',
             'batch_number'  => 'nullable|string',
-            'expiry_date'   => 'nullable|date'
+            'expiry_date'   => 'nullable|date',
+            'unit'          => 'nullable|string',
+            'brand'         => 'nullable|string'
         ], [
             'name.unique' => 'Barang dengan nama ini sudah ada di cabang ini.'
         ]);
@@ -105,6 +114,8 @@ class ItemController extends Controller
             'location_id' => $request->user()->location_id,
             'category_id' => $request->category_id,
             'name'        => $request->name,
+            'unit'        => $request->unit,
+            'brand'       => $request->brand,
             'type'        => $request->type,
             'min_stock'   => $request->min_stock,
         ]);
@@ -120,6 +131,7 @@ class ItemController extends Controller
                 $request->initial_stock,
                 $request->batch_number,
                 $request->expiry_date,
+                $request->unit_cost ?? 0,
                 'initial_stock',
                 $item->id
             );
@@ -146,13 +158,17 @@ class ItemController extends Controller
             ],
             'category_id' => 'required|exists:categories,id',
             'type'        => 'required|in:stock,non-stock',
-            'min_stock'   => 'required|integer|min:0'
+            'min_stock'   => 'required|integer|min:0',
+            'unit'        => 'nullable|string',
+            'brand'       => 'nullable|string'
         ], [
             'name.unique' => 'Barang dengan nama ini sudah ada di cabang ini.'
         ]);
 
         $item->update([
             'name'        => $request->name,
+            'unit'        => $request->unit,
+            'brand'       => $request->brand,
             'category_id' => $request->category_id,
             'type'        => $request->type,
             'min_stock'   => $request->min_stock
@@ -190,6 +206,7 @@ class ItemController extends Controller
 
         $request->validate([
             'quantity'     => 'required|integer|min:1',
+            'unit_cost'    => 'nullable|numeric|min:0',
             'batch_number' => 'nullable|string',
             'expiry_date'  => 'nullable|date',
         ]);
@@ -200,6 +217,7 @@ class ItemController extends Controller
             $request->quantity,
             $request->batch_number,
             $request->expiry_date,
+            $request->unit_cost ?? 0,
             'adjust_in',
             $request->reference_id ?? null
         );

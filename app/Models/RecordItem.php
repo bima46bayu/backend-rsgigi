@@ -12,7 +12,9 @@ class RecordItem extends Model
         'record_id',
         'record_treatment_id',
         'item_id',
-        'quantity'
+        'quantity',
+        'unit_cost',
+        'subtotal'
     ];
 
     public function record()

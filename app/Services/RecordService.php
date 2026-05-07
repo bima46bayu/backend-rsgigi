@@ -152,13 +152,20 @@ class RecordService
                     continue;
                 }
 
-                $this->inventoryService->stockOut(
+                $totalCost = $this->inventoryService->stockOut(
                     $record->location_id,
                     $recordItem->item_id,
                     $recordItem->quantity,
                     'record',
                     $record->id
                 );
+
+                $unitCost = $recordItem->quantity > 0 ? $totalCost / $recordItem->quantity : 0;
+                
+                $recordItem->update([
+                    'unit_cost' => $unitCost,
+                    'subtotal' => $totalCost
+                ]);
             }
 
             $record->update([
@@ -198,6 +205,9 @@ class RecordService
                     $record->location_id,
                     $recordItem->item_id,
                     $recordItem->quantity,
+                    null, // batch number (auto generated)
+                    null, // expiry date
+                    $recordItem->unit_cost ?? 0,
                     'record_reversal',
                     $record->id
                 );

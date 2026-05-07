@@ -20,6 +20,7 @@ class InventoryService
         int $quantity,
         ?string $batchNumber = null,
         ?string $expiryDate = null,
+        float $unitCost = 0,
         ?string $referenceType = null,
         ?int $referenceId = null
     ): void {
@@ -30,6 +31,7 @@ class InventoryService
             $quantity,
             $batchNumber,
             $expiryDate,
+            $unitCost,
             $referenceType,
             $referenceId
         ) {
@@ -47,6 +49,7 @@ class InventoryService
                 'location_id'  => $locationId,
                 'batch_number' => $finalBatchNumber,
                 'quantity'     => $quantity,
+                'unit_cost'    => $unitCost,
                 'expiry_date'  => $expiryDate,
             ]);
 
@@ -74,9 +77,9 @@ class InventoryService
         int $quantity,
         ?string $referenceType = null,
         ?int $referenceId = null
-    ): void {
+    ): float {
 
-        DB::transaction(function () use (
+        return DB::transaction(function () use (
             $locationId,
             $itemId,
             $quantity,
@@ -99,6 +102,7 @@ class InventoryService
             }
 
             $remaining = $quantity;
+            $totalCost = 0;
 
             $batches = $item->stocks()
                 ->where('location_id', $locationId)
@@ -112,6 +116,9 @@ class InventoryService
                 if ($remaining <= 0) break;
 
                 $deduct = min($batch->quantity, $remaining);
+                
+                $cost = $deduct * $batch->unit_cost;
+                $totalCost += $cost;
 
                 $batch->decrement('quantity', $deduct);
 
@@ -131,6 +138,8 @@ class InventoryService
             }
 
             $item->increment('version');
+            
+            return $totalCost;
         });
     }
 

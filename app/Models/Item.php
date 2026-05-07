@@ -16,6 +16,8 @@ class Item extends Model
         'location_id',
         'category_id',
         'name',
+        'unit',
+        'brand',
         'type',
         'min_stock',
         'alert_status',

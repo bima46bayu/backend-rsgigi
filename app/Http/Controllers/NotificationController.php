@@ -10,6 +10,7 @@ class NotificationController extends Controller
     {
         return $request->user()
             ->notifications()
+            ->where('created_at', '>=', now()->subDays(30))
             ->latest()
             ->paginate(20);
     }

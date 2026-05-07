@@ -13,6 +13,7 @@ class ItemStock extends Model
         'location_id',
         'batch_number',
         'quantity',
+        'unit_cost',
         'expiry_date'
     ];
 
