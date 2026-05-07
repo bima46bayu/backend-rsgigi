@@ -18,7 +18,8 @@ class ItemStock extends Model
     ];
 
     protected $casts = [
-        'expiry_date' => 'date'
+        'expiry_date' => 'date',
+        'expiry_alert_sent_at' => 'datetime'
     ];
 
     public function item()

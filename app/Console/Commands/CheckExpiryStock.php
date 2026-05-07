@@ -41,8 +41,8 @@ class CheckExpiryStock extends Command
             foreach ($locationStocks as $stock) {
 
                 // Anti spam: Jangan kirim notifikasi jika baru saja dikirim pada hari kalender yang sama
-                if ($stock->expiry_alert_sent_at &&
-                    $stock->expiry_alert_sent_at->isSameDay(now())) {
+                $lastSent = $stock->expiry_alert_sent_at;
+                if ($lastSent instanceof \Carbon\Carbon && $lastSent->isSameDay(now())) {
                     continue;
                 }
 
