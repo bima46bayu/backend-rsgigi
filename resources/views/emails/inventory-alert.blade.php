@@ -58,7 +58,7 @@
         <p>Mohon segera lakukan pengadaan atau restock barang di atas untuk memastikan operasional berjalan lancar.</p>
 
         <center>
-            <a href="{{ config('app.url') }}" class="btn">Buka Dashboard Inventaris</a>
+            <a href="https://kelurahanlimbaudua.web.id" class="btn">Buka Dashboard Inventaris</a>
         </center>
 
         <div class="footer">

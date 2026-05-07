@@ -71,7 +71,7 @@
         <p>Mohon segera lakukan pemindahan, retur, atau tindakan lain yang diperlukan untuk meminimalkan kerugian stok.</p>
 
         <center>
-            <a href="{{ config('app.url') }}" class="btn">Buka Dashboard Inventaris</a>
+            <a href="https://kelurahanlimbaudua.web.id" class="btn">Buka Dashboard Inventaris</a>
         </center>
 
         <div class="footer">
