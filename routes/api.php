@@ -13,6 +13,7 @@ use App\Http\Controllers\RecordController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PurchaseController;
 use App\Http\Controllers\GoodsReceiptController;
+use App\Http\Controllers\ExportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -71,6 +72,9 @@ Route::middleware('auth:sanctum')->group(function () {
         [GoodsReceiptController::class, 'store']);
     Route::post('goods-receipts/{goodsReceipt}/complete', 
         [GoodsReceiptController::class, 'complete']);
+
+    Route::get('/export/inventory', [ExportController::class, 'inventory']);
+    Route::get('/export/history', [ExportController::class, 'history']);
 
     /*
     |--------------------------------------------------------------------------
