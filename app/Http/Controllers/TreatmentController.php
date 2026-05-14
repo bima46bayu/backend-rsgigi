@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Treatment;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class TreatmentController extends Controller
 {
@@ -37,10 +38,18 @@ class TreatmentController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'name' => 'required|string',
+            'name' => [
+                'required',
+                'string',
+                Rule::unique('treatments')->where(function ($query) use ($request) {
+                    return $query->where('location_id', $request->user()->location_id);
+                })
+            ],
             'items' => 'nullable|array',
             'items.*.id' => 'required_with:items|exists:items,id',
             'items.*.quantity' => 'required_with:items|integer|min:1'
+        ], [
+            'name.unique' => 'Tindakan medis dengan nama ini sudah ada di cabang Anda.'
         ]);
 
         $treatment = Treatment::create([
@@ -72,6 +81,21 @@ class TreatmentController extends Controller
     {
         $treatment = Treatment::where('location_id', $request->user()->location_id)
                               ->findOrFail($id);
+
+        $request->validate([
+            'name' => [
+                'required',
+                'string',
+                Rule::unique('treatments')->where(function ($query) use ($request) {
+                    return $query->where('location_id', $request->user()->location_id);
+                })->ignore($id)
+            ],
+            'items' => 'nullable|array',
+            'items.*.id' => 'required_with:items|exists:items,id',
+            'items.*.quantity' => 'required_with:items|integer|min:1'
+        ], [
+            'name.unique' => 'Tindakan medis dengan nama ini sudah ada di cabang Anda.'
+        ]);
 
         $treatment->update([
             'code'        => $request->code,
