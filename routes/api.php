@@ -41,6 +41,9 @@ Route::middleware('auth:sanctum')->group(function () {
     
     Route::apiResource('categories', CategoryController::class);
     Route::apiResource('suppliers', SupplierController::class);
+    
+    Route::post('/items/import', [ItemController::class, 'import']);
+    Route::get('/items/import/template', [ItemController::class, 'downloadTemplate']);
     Route::apiResource('items', ItemController::class);
     Route::apiResource('treatments', TreatmentController::class);
     Route::apiResource('records', RecordController::class)

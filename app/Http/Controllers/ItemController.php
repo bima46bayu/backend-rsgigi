@@ -6,6 +6,9 @@ use App\Models\Item;
 use Illuminate\Http\Request;
 use App\Services\InventoryService;
 use Illuminate\Validation\Rule;
+use App\Imports\ItemsImport;
+use App\Exports\ItemsTemplateExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ItemController extends Controller
 {
@@ -271,5 +274,30 @@ class ItemController extends Controller
             'item_id' => $item->id,
             'total_stock' => $total
         ]);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | IMPORT & TEMPLATE
+    |--------------------------------------------------------------------------
+    */
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls,csv|max:5120'
+        ]);
+
+        try {
+            Excel::import(new ItemsImport($request->user()->location_id), $request->file('file'));
+            return response()->json(['message' => 'Data barang berhasil diimport']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new ItemsTemplateExport, 'Template_Import_Barang.xlsx');
     }
 }
