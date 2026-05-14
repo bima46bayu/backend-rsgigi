@@ -130,10 +130,10 @@ class TreatmentController extends Controller
         $treatment = Treatment::where('location_id', $request->user()->location_id)
                               ->findOrFail($id);
 
-        $treatment->update(['is_active' => false]);
+        $treatment->delete();
 
         return response()->json([
-            'message' => 'Treatment dinonaktifkan'
+            'message' => 'Treatment berhasil dihapus'
         ]);
     }
 }
