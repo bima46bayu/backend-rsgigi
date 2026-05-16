@@ -50,7 +50,7 @@ class RecordController extends Controller
     {
         $request->validate([
             'patient_name' => 'nullable|string',
-            'treatments' => 'required|array',
+            'treatments' => 'nullable|array',
             'treatments.*' => 'exists:treatments,id'
         ]);
 
@@ -104,5 +104,17 @@ class RecordController extends Controller
     public function reject($id)
     {
         return $this->recordService->reject($id);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE DRAFT RECORD (ROLLBACK)
+    |--------------------------------------------------------------------------
+    */
+
+    public function destroy($id)
+    {
+        $this->recordService->deleteDraft($id);
+        return response()->json(['message' => 'Draft deleted']);
     }
 }

@@ -23,7 +23,7 @@ class RecordService
     |--------------------------------------------------------------------------
     */
 
-    public function createDraft(int $locationId, array $treatments, ?string $patientName)
+    public function createDraft(int $locationId, ?array $treatments, ?string $patientName)
     {
         return DB::transaction(function () use ($locationId, $treatments, $patientName) {
 
@@ -34,12 +34,13 @@ class RecordService
                 'status' => 'draft'
             ]);
 
-            foreach ($treatments as $treatmentId) {
+            if (!empty($treatments)) {
+                foreach ($treatments as $treatmentId) {
 
-                $rt = RecordTreatment::create([
-                    'record_id' => $record->id,
-                    'treatment_id' => $treatmentId
-                ]);
+                    $rt = RecordTreatment::create([
+                        'record_id' => $record->id,
+                        'treatment_id' => $treatmentId
+                    ]);
 
                 $treatment = Treatment::with('items')->findOrFail($treatmentId);
 
@@ -52,6 +53,7 @@ class RecordService
                         'quantity' => $item->pivot->quantity
                     ]);
                 }
+            }
             }
 
             return $record->load('items', 'treatments');
@@ -131,11 +133,7 @@ class RecordService
 
                 if ($totalStock < $recordItem->quantity) {
 
-                    $insufficientItems[] = [
-                        'item_id'   => $recordItem->item_id,
-                        'requested' => $recordItem->quantity,
-                        'available' => $totalStock
-                    ];
+                    $insufficientItems[] = "{$recordItem->item->name} (Tersedia: {$totalStock}, Diminta: {$recordItem->quantity})";
                 }
             }
 
@@ -218,6 +216,27 @@ class RecordService
             ]);
 
             return $record->fresh()->load('items');
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DELETE DRAFT (ROLLBACK)
+    |--------------------------------------------------------------------------
+    */
+
+    public function deleteDraft(int $recordId)
+    {
+        return DB::transaction(function () use ($recordId) {
+            $record = Record::findOrFail($recordId);
+
+            if ($record->status !== 'draft') {
+                throw new Exception('Hanya record draft yang bisa dihapus permanen.');
+            }
+
+            $record->items()->delete();
+            $record->treatments()->delete();
+            $record->delete();
         });
     }
 }

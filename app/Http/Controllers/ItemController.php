@@ -196,6 +196,51 @@ class ItemController extends Controller
         return response()->json(['message' => 'Item deleted']);
     }
 
+    public function bulkDestroy(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:items,id'
+        ]);
+
+        Item::where('location_id', $request->user()->location_id)
+            ->whereIn('id', $request->ids)
+            ->delete();
+
+        return response()->json(['message' => 'Barang-barang terpilih berhasil dihapus.']);
+    }
+
+    public function bulkUpdate(Request $request)
+    {
+        $request->validate([
+            'ids' => 'required|array',
+            'ids.*' => 'exists:items,id',
+            'category_id' => 'nullable|exists:categories,id',
+            'type' => 'nullable|in:stock,non-stock',
+            'min_stock' => 'nullable|integer|min:0',
+            'unit' => 'nullable|string',
+            'brand' => 'nullable|string'
+        ]);
+
+        $updateData = array_filter([
+            'category_id' => $request->category_id,
+            'type' => $request->type,
+            'min_stock' => $request->min_stock,
+            'unit' => $request->unit,
+            'brand' => $request->brand
+        ], fn($value) => !is_null($value));
+
+        if (empty($updateData)) {
+            return response()->json(['message' => 'Tidak ada data yang diperbarui.'], 400);
+        }
+
+        Item::where('location_id', $request->user()->location_id)
+            ->whereIn('id', $request->ids)
+            ->update($updateData);
+
+        return response()->json(['message' => 'Barang-barang terpilih berhasil diperbarui.']);
+    }
+
     /*
     |--------------------------------------------------------------------------
     | STOCK IN (Dari GR / Purchase)
