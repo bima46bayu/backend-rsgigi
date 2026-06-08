@@ -53,6 +53,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/items/{id}/stocks', [ItemController::class, 'stocks']);
     Route::get('/items/{id}/transactions', [ItemController::class, 'transactions']);
+    Route::post('/items/stocks/{stock_id}/dispose', [ItemController::class, 'dispose']);
 
     // Treatment / Medical Action POS
     Route::get('/records', [RecordController::class, 'index']);

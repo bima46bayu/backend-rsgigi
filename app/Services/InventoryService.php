@@ -145,6 +145,53 @@ class InventoryService
 
     /*
     |--------------------------------------------------------------------------
+    | STOCK DISPOSAL (EXPIRED / DAMAGED)
+    |--------------------------------------------------------------------------
+    */
+
+    public function disposeStock(
+        int $locationId,
+        int $itemStockId,
+        int $quantity,
+        ?string $note = null
+    ): void {
+        DB::transaction(function () use (
+            $locationId,
+            $itemStockId,
+            $quantity,
+            $note
+        ) {
+            $batch = \App\Models\ItemStock::lockForUpdate()->findOrFail($itemStockId);
+
+            if ($batch->location_id !== $locationId) {
+                throw new Exception('Stock batch tidak ditemukan di lokasi Anda.');
+            }
+
+            if ($batch->quantity < $quantity) {
+                throw new Exception("Kuantitas yang dibuang ($quantity) melebihi stok yang ada pada batch ini ({$batch->quantity}).");
+            }
+
+            $item = Item::lockForUpdate()->findOrFail($batch->item_id);
+
+            // Kurangi kuantitas di batch
+            $batch->decrement('quantity', $quantity);
+
+            // Buat transaksi keluar
+            // Kita gunakan reference_type 'disposal' (atau custom text)
+            $item->transactions()->create([
+                'item_stock_id'  => $batch->id,
+                'type'           => 'out',
+                'quantity'       => $quantity,
+                'reference_type' => 'disposal',
+                'reference_id'   => null,
+            ]);
+
+            $item->increment('version');
+        });
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | GET TOTAL STOCK
     |--------------------------------------------------------------------------
     */

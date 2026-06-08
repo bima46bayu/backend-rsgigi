@@ -301,6 +301,33 @@ class ItemController extends Controller
 
     /*
     |--------------------------------------------------------------------------
+    | STOCK DISPOSAL (EXPIRED)
+    |--------------------------------------------------------------------------
+    */
+
+    public function dispose(Request $request, $stockId)
+    {
+        $request->validate([
+            'quantity' => 'required|integer|min:1',
+            'note'     => 'nullable|string'
+        ]);
+
+        try {
+            $this->inventoryService->disposeStock(
+                $request->user()->location_id,
+                $stockId,
+                $request->quantity,
+                $request->note
+            );
+
+            return response()->json(['message' => 'Stok berhasil dibuang/disposal.']);
+        } catch (\Exception $e) {
+            return response()->json(['message' => $e->getMessage()], 400);
+        }
+    }
+
+    /*
+    |--------------------------------------------------------------------------
     | GET TOTAL STOCK
     |--------------------------------------------------------------------------
     */
